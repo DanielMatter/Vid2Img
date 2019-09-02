@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Displacement</title>
+</head>
+<body>
+    
+    <input id="fileinput" type="file" multiple />
+
+    <svg viewport="0 0 256 512" height="512" width="256">
+        <defs>
+            <filter id="displacement" primitiveUnits="objectBoundingBox">
+                <feImage id="filter-img" xlink:href="" result="displaceimage" />
+                <feDisplacementMap id="filter-displace" color-interpolation-filters="sRGB" in="SourceGraphic" in2="displaceimage" xChannelSelector="R" yChannelSelector="G" scale="1" />
+            </filter>
+        </defs>
+
+        <image xlink:href="" x="0" y="0" height="256" width="256" id="image-original" filter="url(#displacement)" />
+        <image xlink:href="" x="0" y="256" height="256" width="256" id="image-reference" />
+    </svg>
+
+    <input type="range" id="cowbell" name="cowbell" min="0" max="1" value="1" step="0.001">
+
+    <script>
+        Array.prototype.split = function(stride) {
+            const length = Math.floor(this.length / stride)
+            const array = []
+            for(let i = 0; i < length; i++) {
+                array.push([])
+                for(let j = 0; j < stride; j++) {
+                    array[i].push(this[i * stride + j])
+                }
+            }
+            return array
+        }
+
+        const readCSV = (file) => new Promise((res, rej) => {
+            const reader = new FileReader()
+            reader.onload = (file => {
+                const text = file.target.result
+                const array = text.split("\n").map(line => line.split(",").map(number => parseFloat(number)))
+                res(array)
+            })
+            reader.readAsText(file)
+        })
+
+        const uuid = () => '_' + Math.round(10e8 * Math.random()).toString(16)
+
+        const element = (name, parent = null, attrs = {}) => {
+            const el = document.createElement(name)
+            for(let key in attrs) {
+                el.setAttribute(key, attrs[key])
+            }
+
+            if(parent)
+                parent.append(el)
+
+            return el
+        }
+        const elementSVG = (name, parent = null, attrs = {}) => {
+            const el = document.createElementNS("http://www.w3.org/2000/svg", name)
+            for(let key in attrs) {
+                el.setAttribute(key, attrs[key])
+            }
+
+            if(parent)
+                parent.append(el)
+
+            return el
+        }
+
+        const createDisplacementMap = (u, v) => {
+            const canvas = element("canvas", document.body, {
+                height: u.length,
+                width: u[0].length
+            })
+            const ctx = canvas.getContext("2d")
+
+            ctx.fillStyle = "rgb(127, 127, 127)"
+            ctx.fillRect(0,0,64,64)
+
+            ctx.fillStyle = "rgb(0, 127, 127)"
+            ctx.beginPath()
+            ctx.arc(32, 32, 16, 0, Math.PI * 2)
+            ctx.fill()
+
+            /*
+            const data = ctx.createImageData(u[0].length, u.length)
+
+            for(let x = 0; x < u[0].length; x++)
+            for(let y = 0; y < u.length; y++) {
+                const index = 4 * (x + y * u[0].length)
+                data.data[index] = Math.round(127.5 * u[y][x] + 127.5)
+                data.data[index+1] = Math.round(127.5 * v[y][x] + 127.5)
+                data.data[index+3] = 255
+            }
+            ctx.putImageData(data, 0, 0)
+            */
+            const imageData = canvas.toDataURL('image/png')
+            return imageData
+        }
+
+        const createDataURL = (image, width, height) => {
+            const canvas = element("canvas", document.body, {
+                height: height,
+                width: width,
+            })
+            const ctx = canvas.getContext("2d")
+            const data = ctx.createImageData(width, height)
+
+            for(let x = 0; x < width; x++)
+            for(let y = 0; y < height; y++) {
+                const index = 4 * (x + y * width)
+                data.data[index] = image[y * width + x]
+                data.data[index+1] = image[y * width + x]
+                data.data[index+2] = image[y * width + x]
+                data.data[index+3] = 255
+            }
+            ctx.putImageData(data, 0, 0)
+            const imageData = canvas.toDataURL('image/png')
+            return imageData
+        }
+
+        const renderImagePair = (imgs, us, vs, index, elDisplaceMap, elDisplace, elOriginalImage, elReferenceImage, elSlider = null) => {
+            const map = createDisplacementMap(us[index], vs[index])
+            elDisplaceMap.setAttribute("xlink:href", map)
+            elOriginalImage.setAttribute("xlink:href", createDataURL(imgs[index], 64, 64))
+            elReferenceImage.setAttribute("xlink:href", createDataURL(imgs[index+1], 64, 64))
+
+            if(elSlider) {
+                elSlider.onchange = (e) => {
+                    console.log(e.target.value)
+                    elDisplace.setAttribute("scale", e.target.value)
+                }
+            }
+        }
+
+
+        const fileinput = document.querySelector("#fileinput")
+        fileinput.onchange = async (e) => {
+            const { files } = e.target
+            if(files.length != 3)
+                return
+
+            const imgs = await readCSV(Array.from(files).find(file => file.name.startsWith("imseq")))
+            const u = await readCSV(Array.from(files).find(file => file.name.startsWith("u_")))
+            const v = await readCSV(Array.from(files).find(file => file.name.startsWith("v_")))
+
+            const width = 64
+            const height = 64
+
+            const us = []
+            const vs = []
+
+            const tmpU = u.map(row => row.split(width))
+            const tmpV = v.map(row => row.split(width))
+
+            for(let i = 0; i < imgs.length; i++) {
+                us.push([])
+                vs.push([])
+
+                for(let y = 0; y < height; y++) {
+                    us[i].push(tmpU[y][i])
+                    vs[i].push(tmpV[y][i])
+                }
+            }
+            
+            renderImagePair(
+                imgs, us, vs, 0,
+                document.querySelector("#filter-img"),
+                document.querySelector("#filter-displace"),
+                document.querySelector("#image-original"),
+                document.querySelector("#image-reference"),
+                document.querySelector("#cowbell")
+            )            
+        }
+        
+        const canvas = document.createElement("canvas")
+        const ctx = canvas.getContext("2d")
+        document.body.append(canvas)
+
+        const image = document.createElement("img")
+        document.body.append(image)
+
+        canvas.height = 100
+        canvas.width = 100
+
+        ctx.fillStyle = "rgb(17, 127, 127)"
+        ctx.fillRect(0, 0, 100, 100)
+
+        const url = canvas.toDataURL('image/png')
+        image.src = url
+
+        document.querySelector("#filter-img").setAttribute("xlink:href", url)
+
+    </script>
+
+</body>
+</html>

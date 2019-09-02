@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="./style.css" />
+
+    <script src="./script.js"></script>
+</head>
+<body>
+        
+    <div id="videocontainer">
+        <div id="videowrapper">
+            <video src="" id="usermedia" autoplay="true">
+            </video>
+            <div id="counter" class="">0</div>
+        </div>
+        <canvas id="canvas" style="display: none"></canvas>
+
+        <div id="controls">
+            Capture
+            <input id="inputnumber" type="text" value="5" />
+            pictures, one every
+            <input id="inputtime" type="text" value="1" />
+            seconds.
+            <br />
+            <br />
+            Each picture has a size of 
+            <input id="inputsize" type="text" value="64" />x<span id="copysize">64</span> pixels.
+        </div>
+    </div>
+    
+    <div id="previewarea">
+
+    </div>
+
+    <div id="outputcontainer">
+        <button id="export">Exportieren</button>
+        <img src="" alt="" id="img">
+    </div>
+    
+
+    <script>
+        start()
+    </script>
+</body>
+</html>
